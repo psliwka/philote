@@ -3,1031 +3,6 @@
 	
 do
 	local _ENV = _ENV
-	package.preload["BinDecHex"] = function( ... )
-		local arg = _G.arg;
-		_ENV = _ENV;
-
-		--[[
-/*
- * Copyright (c) 2007 Tim Kelly/Dialectronics
- *
- * Permission is hereby granted, free of charge, to any person obtaining 
- * a copy of this software and associated documentation files (the 
- * "Software"),  to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
- * distribute, sublicense, and/or sell copies of the Software, and to permit 
- * persons to whom the Software is furnished to do so, subject to the 
- * following conditions:
- *
- * The above copyright notice and this permission notice shall be 
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT 
- * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR 
- * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
---]]
-
---[[
-/*
- * Copyright (c) 2007 Tim Kelly/Dialectronics
- *
- * Permission is hereby granted, free of charge, to any person obtaining 
- * a copy of this software and associated documentation files (the 
- * "Software"),  to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
- * distribute, sublicense, and/or sell copies of the Software, and to permit 
- * persons to whom the Software is furnished to do so, subject to the 
- * following conditions:
- *
- * The above copyright notice and this permission notice shall be 
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT 
- * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR 
- * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-/* Thanks to Bernard Clabots for string.gfind to make forward compatible to Lua 5.2 */
-
---]]
-
-module(..., package.seeall);
-
-string.gfind = string.gfind or string.gmatch
-
-local hex2bin = {
-	["0"] = "0000",
-	["1"] = "0001",
-	["2"] = "0010",
-	["3"] = "0011",
-	["4"] = "0100",
-	["5"] = "0101",
-	["6"] = "0110",
-	["7"] = "0111",
-	["8"] = "1000",
-	["9"] = "1001",
-	["a"] = "1010",
-        ["b"] = "1011",
-        ["c"] = "1100",
-        ["d"] = "1101",
-        ["e"] = "1110",
-        ["f"] = "1111"
-	}
-
-
-
-local bin2hex = {
-	["0000"] = "0",
-	["0001"] = "1",
-	["0010"] = "2",
-	["0011"] = "3",
-	["0100"] = "4",
-	["0101"] = "5",
-	["0110"] = "6",
-	["0111"] = "7",
-	["1000"] = "8",
-	["1001"] = "9",
-	["1010"] = "A",
-        ["1011"] = "B",
-        ["1100"] = "C",
-        ["1101"] = "D",
-        ["1110"] = "E",
-        ["1111"] = "F"
-	}
-
---[[
-local dec2hex = {
-	["0"] = "0",
-	["1"] = "1",
-	["2"] = "2",
-	["3"] = "3",
-	["4"] = "4",
-	["5"] = "5",
-	["6"] = "6",
-	["7"] = "7",
-	["8"] = "8",
-	["9"] = "9",
-	["10"] = "A",
-	["11"] = "B",
-	["12"] = "C",
-	["13"] = "D",
-	["14"] = "E",
-	["15"] = "F"
-	}
---]]
-
-
--- These functions are big-endian and take up to 32 bits
-
--- Hex2Bin
--- Bin2Hex
--- Hex2Dec
--- Dec2Hex
--- Bin2Dec
--- Dec2Bin
-
-
-function Hex2Bin(s)
-
--- s	-> hexadecimal string
-
-local ret = ""
-local i = 0
-
-
-	for i in string.gfind(s, ".") do
-		i = string.lower(i)
-
-		ret = ret..hex2bin[i]
-
-	end
-
-	return ret
-end
-
-
-function Bin2Hex(s)
-
--- s 	-> binary string
-
-local l = 0
-local h = ""
-local b = ""
-local rem
-
-l = string.len(s)
-rem = l % 4
-l = l-1
-h = ""
-
-	-- need to prepend zeros to eliminate mod 4
-	if (rem > 0) then
-		s = string.rep("0", 4 - rem)..s
-	end
-
-	for i = 1, l, 4 do
-		b = string.sub(s, i, i+3)
-		h = h..bin2hex[b]
-	end
-
-	return h
-
-end
-
-
-function Bin2Dec(s)
-
--- s	-> binary string
-
-local num = 0
-local ex = string.len(s) - 1
-local l = 0
-
-	l = ex + 1
-	for i = 1, l do
-		b = string.sub(s, i, i)
-		if b == "1" then
-			num = num + 2^ex
-		end
-		ex = ex - 1
-	end
-
-	return string.format("%u", num)
-
-end
-
-
-
-function Dec2Bin(s, num)
-
--- s	-> Base10 string
--- num  -> string length to extend to
-
-local n
-
-	if (num == nil) then
-		n = 0
-	else
-		n = num
-	end
-
-	s = string.format("%x", s)
-
-	s = Hex2Bin(s)
-
-	while string.len(s) < n do
-		s = "0"..s
-	end
-
-	return s
-
-end
-
-
-
-
-function Hex2Dec(s)
-
--- s	-> hexadecimal string
-
-local s = Hex2Bin(s)
-
-	return Bin2Dec(s)
-
-end
-
-
-
-function Dec2Hex(s)
-
--- s	-> Base10 string
-
-	s = string.format("%x", s)
-
-	return s
-
-end
-
-
-
-
--- These functions are big-endian and will extend to 32 bits
-
--- BMAnd
--- BMNAnd
--- BMOr
--- BMXOr
--- BMNot
-
-
-function BMAnd(v, m)
-
--- v	-> hex string to be masked
--- m	-> hex string mask
-
--- s	-> hex string as masked
-
--- bv	-> binary string of v
--- bm	-> binary string mask
-
-local bv = Hex2Bin(v)
-local bm = Hex2Bin(m)
-
-local i = 0
-local s = ""
-
-	while (string.len(bv) < 32) do
-		bv = "0000"..bv
-	end
-
-	while (string.len(bm) < 32) do
-		bm = "0000"..bm
-	end
-
-
-	for i = 1, 32 do
-		cv = string.sub(bv, i, i)
-		cm = string.sub(bm, i, i)
-		if cv == cm then
-			if cv == "1" then
-				s = s.."1"
-			else
-				s = s.."0"
-			end
-		else
-			s = s.."0"
-
-		end
-	end
-
-	return Bin2Hex(s)
-
-end
-
-
-function BMNAnd(v, m)
-
--- v	-> hex string to be masked
--- m	-> hex string mask
-
--- s	-> hex string as masked
-
--- bv	-> binary string of v
--- bm	-> binary string mask
-
-local bv = Hex2Bin(v)
-local bm = Hex2Bin(m)
-
-local i = 0
-local s = ""
-
-	while (string.len(bv) < 32) do
-		bv = "0000"..bv
-	end
-
-	while (string.len(bm) < 32) do
-		bm = "0000"..bm
-	end
-
-
-	for i = 1, 32 do
-		cv = string.sub(bv, i, i)
-		cm = string.sub(bm, i, i)
-		if cv == cm then
-			if cv == "1" then
-				s = s.."0"
-			else
-				s = s.."1"
-			end
-		else
-			s = s.."1"
-
-		end
-	end
-
-	return Bin2Hex(s)
-
-end
-
-
-
-function BMOr(v, m)
-
--- v	-> hex string to be masked
--- m	-> hex string mask
-
--- s	-> hex string as masked
-
--- bv	-> binary string of v
--- bm	-> binary string mask
-
-local bv = Hex2Bin(v)
-local bm = Hex2Bin(m)
-
-local i = 0
-local s = ""
-
-	while (string.len(bv) < 32) do
-		bv = "0000"..bv
-	end
-
-	while (string.len(bm) < 32) do
-		bm = "0000"..bm
-	end
-
-
-	for i = 1, 32 do
-		cv = string.sub(bv, i, i)
-		cm = string.sub(bm, i, i)
-		if cv == "1" then
-				s = s.."1"
-		elseif cm == "1" then
-				s = s.."1"
-		else
-			s = s.."0"
-		end
-	end
-
-	return Bin2Hex(s)
-
-end
-
-function BMXOr(v, m)
-
--- v	-> hex string to be masked
--- m	-> hex string mask
-
--- s	-> hex string as masked
-
--- bv	-> binary string of v
--- bm	-> binary string mask
-
-local bv = Hex2Bin(v)
-local bm = Hex2Bin(m)
-
-local i = 0
-local s = ""
-
-	while (string.len(bv) < 32) do
-		bv = "0000"..bv
-	end
-
-	while (string.len(bm) < 32) do
-		bm = "0000"..bm
-	end
-
-
-	for i = 1, 32 do
-		cv = string.sub(bv, i, i)
-		cm = string.sub(bm, i, i)
-		if cv == "1" then
-			if cm == "0" then
-				s = s.."1"
-			else
-				s = s.."0"
-			end
-		elseif cm == "1" then
-			if cv == "0" then
-				s = s.."1"
-			else
-				s = s.."0"
-			end
-		else
-			-- cv and cm == "0"
-			s = s.."0"
-		end
-	end
-
-	return Bin2Hex(s)
-
-end
-
-
-function BMNot(v, m)
-
--- v	-> hex string to be masked
--- m	-> hex string mask
-
--- s	-> hex string as masked
-
--- bv	-> binary string of v
--- bm	-> binary string mask
-
-local bv = Hex2Bin(v)
-local bm = Hex2Bin(m)
-
-local i = 0
-local s = ""
-
-	while (string.len(bv) < 32) do
-		bv = "0000"..bv
-	end
-
-	while (string.len(bm) < 32) do
-		bm = "0000"..bm
-	end
-
-
-	for i = 1, 32 do
-		cv = string.sub(bv, i, i)
-		cm = string.sub(bm, i, i)
-		if cm == "1" then
-			if cv == "1" then
-				-- turn off
-				s = s.."0"
-			else
-				-- turn on
-				s = s.."1"
-			end
-		else
-			-- leave untouched
-			s = s..cv
-
-		end
-	end
-
-	return Bin2Hex(s)
-
-end
-
-
--- these functions shift right and left, adding zeros to lost or gained bits
--- returned values are 32 bits long
-
--- BShRight(v, nb)
--- BShLeft(v, nb)
-
-
-function BShRight(v, nb)
-
--- v	-> hexstring value to be shifted
--- nb	-> number of bits to shift to the right
-
--- s	-> binary string of v
-
-local s = Hex2Bin(v)
-
-	while (string.len(s) < 32) do
-		s = "0000"..s
-	end
-
-	s = string.sub(s, 1, 32 - nb)
-
-	while (string.len(s) < 32) do
-		s = "0"..s
-	end
-
-	return Bin2Hex(s)
-
-end
-
-function BShLeft(v, nb)
-
--- v	-> hexstring value to be shifted
--- nb	-> number of bits to shift to the right
-
--- s	-> binary string of v
-
-local s = Hex2Bin(v)
-
-	while (string.len(s) < 32) do
-		s = "0000"..s
-	end
-
-	s = string.sub(s, nb + 1, 32)
-
-	while (string.len(s) < 32) do
-		s = s.."0"
-	end
-
-	return Bin2Hex(s)
-
-end
-
-	end
-	package.preload["ansible"] = function( ... )
-		local arg = _G.arg;
-		_ENV = _ENV;
-
-		local Ansible = {}
-
-local io   = require("io")
-local json = require("dkjson")
-local ubus = require("ubus")
-
-Ansible.__index = Ansible
-
-function Ansible.new(spec) 
-	local self = setmetatable({}, Ansible)
-	self.spec = spec
-	for k,v in pairs(spec) do
-		v['name'] = k
-	end
-	self.params = nil
-	return self
-end
-
-local function split(str, delimiter)
-	local toks = {}
-
-	for tok in string.gmatch(str, "[^".. delimiter .. "]+") do
-		toks[#toks + 1] = tok
-	end
-
-	return toks
-end
-
-local function append(t1, t2)
-	for k,v in ipairs(t2) do
-		t1[#t1 + 1] = v
-	end
-	return t1
-end
-
-function Ansible.contains(needle, haystack)
-	for _,v in pairs(haystack) do
-		if needle == v then
-			return true
-		end
-	end
-
-	return false
-end
-
-local function findspec(name, spec)
-	if spec[name] then
-		return spec[name]
-	end
-
-	-- check whether an alias exists
-	for k,v in pairs(spec) do
-		if type(v) == "table" and v['aliases'] then
-			if Ansible.contains(name, v['aliases']) then
-				return v
-			end
-		end
-	end
-
-	return nil
-end
-
-local function canonicalize(params, spec)
-	local copy = {}
-	for k,v in pairs(params) do
-		local desc = findspec(k, spec)
-		if not desc then
-			-- ignore _ansible parameters
-			if 1 ~= string.find(k, "_ansible") then
-				return nil, "no such parameter " .. k
-			end
-		else
-			if copy[desc['name']] then
-				return nil, "duplicate parameter " .. desc['name']
-			end
-			copy[desc['name']] = v
-		end
-	end
-
-	params = copy
-
-	return copy
-end
-
-function Ansible:slurp(path)
-	local f, err = io.open(path, "r")
-	if f == nil then
-		Ansible.fail_json({msg="failed to open file " .. path .. ": " .. err})
-	end
-	local content = f:read("*a")
-	if content == nil then
-		self:fail_json({msg="read from file " .. path .. "failed"})
-	end
-	f:close()
-	return content
-end
-
-function Ansible:unslurp(path, content)
-	local f, err = io.open(path, "w+")
-	if f == nil then
-		Ansible.fail_json({msg="failed to open file " .. path .. ": " .. err})
-	end
-	
-	local res = f:write(content)
-
-	if not res then
-		self:fail_json({msg="read from file " .. path .. "failed"})
-	end
-	f:close()
-	return res
-end
-
-local function parse_dict_from_string(str)
-	if 1 == string.find(str, "{") then
-		-- assume json, try to decode it
-		local dict, pos, err = json.decode(str)
-		if not err then
-			return dict
-		end
-	elseif string.find(str, "=") then
-		fields = {}
-		field_buffer = ""
-		in_quote = nil
-		in_escape = false
-		for c in str:gmatch(".") do
-			if in_escape then
-				field_buffer = field_buffer .. c
-				in_escape = false
-			elseif c == '\\' then
-				in_escape = true
-			elseif not in_quote and ('\'' == c or '"' == c) then
-				in_quote = c
-			elseif in_quote and in_quote == c then
-				in_quote = nil
-			elseif not in_quote and (',' == c or ' ' == c) then
-				if string.len(field_buffer) > 0 then
-					fields[#fields + 1] = field_buffer
-				end
-				field_buffer=""
-			else
-				field_buffer = field_buffer .. c
-			end
-		end
-		-- append the final field
-		fields[#fields + 1] = field_buffer
-
-		local dict = {}
-
-		for _,v in ipairs(fields) do
-			local key, val = string.match(v, "^([^=]+)=(.*)")
-
-			if key and val then
-				dict[key] = val
-			end
-		end
-
-		return dict
-	end
-
-	return nil, str ..  " dictionary requested, could not parse JSON or key=value"
-end
-
-local function check_transform_type(variable, ansibletype)
-	-- Types: str list dict bool int float path raw jsonarg
-	if     "str"     == ansibletype then
-		if type(variable) == "string" then
-			return variable
-		end
-	elseif "list"    == ansibletype then
-		if type(variable) == "table" then
-			return variable
-		end
-
-		if type(variable) == "string" then
-			return split(variable, ",")
-		elseif type(variable) == "number" then
-			return {variable}
-		end
-	elseif "dict"    == ansibletype then
-		if type(variable) == "table" then
-			return variable
-		elseif type(variable) == "string" then
-			return parse_dict_from_string(variable)
-		end
-	elseif "bool"    == ansibletype then
-		if "boolean" == type(variable) then
-			return variable
-		elseif "number" == type(variable) then
-			return not (0 == variable)
-		elseif "string" == type(variable) then
-			local BOOLEANS_TRUE  = {'yes', 'on', '1', 'true', 'True'}
-			local BOOLEANS_FALSE = {'no', 'off', '0', 'false', 'False'}
-
-			if Ansible.contains(variable, BOOLEANS_TRUE) then
-				return true
-			elseif Ansible.contains(variable, BOOLEANS_FALSE) then
-				return false
-			end
-		end
-	elseif "int"     == ansibletype or "float"   == ansibletype then
-		if type(variable) == "string" then
-			local var = tonumber(variable)
-			if var then
-				return var
-			end
-		elseif type(variable) == "number" then
-			return variable
-		end
-	elseif "path"    == ansibletype then
-		-- A bit basic, i know
-		if type(variable) == "string" then
-			return variable
-		end
-	elseif "raw"     == ansibletype then
-		return variable
-	elseif "jsonarg" == ansibletype then
-		if     "table" == type(variable) then
-			return variable
-		elseif "string" == type(variable) then
-			local dict, pos, err = json.decode(variable)
-			if not err then
-				return dict
-			end
-		end
-	else
-		return nil, ansibletype .. " is not a known type"
-	end
-
-	return nil, tostring(variable) .. " does not conform to type " .. ansibletype
-end
-
-function Ansible:parse(inputfile)
-	local params, pos, err = json.decode(self:slurp(inputfile))
-
-	if err then
-		self:fail_json({msg="INTERNAL: Illegal json input received"})
-	end
-
-	-- resolve aliases
-	params, err = canonicalize(params, self.spec)
-
-	if not params then
-		self:fail_json({msg="Err: " .. tostring(err)})
-	end
-
-	for k,v in pairs(self.spec) do
-		-- setup defaults
-		if v['default'] then
-			if nil == params[k] then
-				params[k] = v['default']
-			end
-		end
-
-		-- assert requires
-		if v['required'] then
-			if not params[k] then
-				self:fail_json({msg="Required parameter " .. k .. " not provided"})
-			end
-		end
-	end
-	
-	-- check types/choices
-	for k,v in pairs(params) do
-		local typedesc = self.spec[k]['type']
-		if typedesc then
-			local val, err = check_transform_type(v, typedesc)
-			if nil ~= val then
-				params[k] = val
-			else
-				self:fail_json({msg="Err: " .. tostring(err)})
-			end
-		end
-
-		local choices = self.spec[k]['choices']
-		if choices then
-			if not Ansible.contains(v, choices) then
-				self:fail_json({msg=v .. " not a valid choice for " .. k})
-			end
-		end
-	end
-
-	self.params = params
-
-	return params
-end
-
-local function file_exists(path)
-	local f=io.open(path,"r")
-	if f~=nil then
-		io.close(f)
-		return true
-	else
-		return false
-	end
-end
-
-function Ansible:get_bin_path(name, required, candidates)
-	if not candidates then
-		candidates = {}
-	end
-
-	local path = os.getenv("PATH")
-	if path then
-		candidates = append(candidates, split(path, ":"))
-	end
-
-	for _,dir in pairs(candidates) do
-		local fpath = dir .. "/" .. name
-		if file_exists(fpath) then
-			return fpath
-		end
-	end
-
-	if required then
-		self:fail_json({msg="No executable " .. name .. " found in PATH or candidates"})
-	end
-	
-	return nil
-end
-
-function Ansible:remove_file(path)
-	local rc, err = os.remove(path)
-	if nil == rc then
-		self:fail_json({msg="Internal, execute: failed to remove file " .. path})
-	end
-	return rc
-end
-
-local function get_version()
-	local version = assert(string.match(_VERSION, "Lua (%d+.%d+)"))
-	return tonumber(version) -- Aaaah, it hurts to use floating point like this...
-end
-
-function Ansible:run_command(command)
-	local stdout = os.tmpname()
-	local stderr = os.tmpname()
-
-	local cmd = string.format("%s >%q 2>%q", command, stdout, stderr)
-
-	local rc = nil
-	if 5.1 < get_version() then
-		_, _, rc = os.execute(cmd)
-	else
-		rc       = os.execute(cmd)
-	end
-
-	local out = self:slurp(stdout)
-	local err = self:slurp(stderr)
-	
-	self:remove_file(stdout)
-	self:remove_file(stderr)
-
-	return rc, out, err
-end
-
-function Ansible:copy(src, dest)
-	local command = string.format("cp -f %q %q", src, dest)
-	local rc, _,  err = self:run_command(command)
-
-	if rc ~= 0 then
-		return false, err
-	else
-		return true, err
-	end
-end
-
-function Ansible:move(src, dest)
-	local command = string.format("mv -f %q %q", src, dest)
-	local rc, _,  err = self:run_command(command)
-
-	if rc ~= 0 then
-		return false, err
-	else
-		return true, err
-	end
-end
-
-function Ansible:fail_json(kwargs)
-	assert(kwargs['msg'])
-	kwargs['failed'] = true
-	if nil == kwargs['changed'] then
-		kwargs['changed'] = false
-	end
-	if nil == kwargs['invocation'] then
-		kwargs['invocations'] = {module_args=self.params}
-	end
-
-	io.write(json.encode(kwargs))
-	os.exit(1)
-end
-
-function Ansible:exit_json(kwargs)
-	assert(kwargs['msg'])
-	if nil == kwargs['changed'] then
-		kwargs['changed'] = false
-	end
-	if nil == kwargs['invocation'] then
-		kwargs['invocations'] = {module_args=self:get_params()}
-	end
-
-	io.write(json.encode(kwargs))
-	os.exit(0)
-end
-
-function Ansible:get_params()
-	return self.params
-end
-
-function Ansible:ubus_connect()
-	local p = self:get_params()
-	local timeout = p['timeout']
-	if not timeout then
-		timeout = 30
-	end
-	local socket = p['socket']
-
-	local conn = ubus.connect(socket, timeout)
-	if not conn then
-		self:fail_json({msg="Failed to connect to ubus"})
-	end
-
-	return conn
-end
-
-function Ansible:ubus_call(conn, namespace, procedure, arg)
-	local res, status = conn:call(namespace, procedure, arg)
-
-	if nil ~= status and 0 ~= status then
-		self:fail_json({msg="Ubus call failed", call={namespace=namespace, procedure=procedure, arg=arg, status=status}})
-	end
-
-	return res
-end
-
-function Ansible:backup_local(file)
-	local backupdest
-
-	if file_exits(file) then
-		local ext = os.time("%Y-%m-%d@H:%M:%S~")
-
-		backupdest = string.format("%s.%s", file, ext)
-
-		local content = self:slurp(file)
-		local res = self:unslurp(backupdest, content)
-	end
-
-	return backupdest
-end
-
-function Ansible:is_dir(path)
-	local f, err, code = io.open(path, "r")
-
-	if nil == f then
-		return false, err, code
-	end
-
-	local ok, err, code = f:read(1)
-	f:close()
-	return code == 21, nil, nil
-end
-
-function Ansible:check_mode()
-	-- FIXME
-	return false
-end
-
-return Ansible
-
-	end
 	package.preload["fileutils"] = function( ... )
 		local arg = _G.arg;
 		_ENV = _ENV;
@@ -1538,6 +513,479 @@ function FileUtil.mkstemp(pattern)
 end
 
 return FileUtil
+
+	end
+	package.preload["ansible"] = function( ... )
+		local arg = _G.arg;
+		_ENV = _ENV;
+
+		local Ansible = {}
+
+local io   = require("io")
+local json = require("dkjson")
+local ubus = require("ubus")
+
+Ansible.__index = Ansible
+
+function Ansible.new(spec) 
+	local self = setmetatable({}, Ansible)
+	self.spec = spec
+	for k,v in pairs(spec) do
+		v['name'] = k
+	end
+	self.params = nil
+	return self
+end
+
+local function split(str, delimiter)
+	local toks = {}
+
+	for tok in string.gmatch(str, "[^".. delimiter .. "]+") do
+		toks[#toks + 1] = tok
+	end
+
+	return toks
+end
+
+local function append(t1, t2)
+	for k,v in ipairs(t2) do
+		t1[#t1 + 1] = v
+	end
+	return t1
+end
+
+function Ansible.contains(needle, haystack)
+	for _,v in pairs(haystack) do
+		if needle == v then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function findspec(name, spec)
+	if spec[name] then
+		return spec[name]
+	end
+
+	-- check whether an alias exists
+	for k,v in pairs(spec) do
+		if type(v) == "table" and v['aliases'] then
+			if Ansible.contains(name, v['aliases']) then
+				return v
+			end
+		end
+	end
+
+	return nil
+end
+
+local function canonicalize(params, spec)
+	local copy = {}
+	for k,v in pairs(params) do
+		local desc = findspec(k, spec)
+		if not desc then
+			-- ignore _ansible parameters
+			if 1 ~= string.find(k, "_ansible") then
+				return nil, "no such parameter " .. k
+			end
+		else
+			if copy[desc['name']] then
+				return nil, "duplicate parameter " .. desc['name']
+			end
+			copy[desc['name']] = v
+		end
+	end
+
+	params = copy
+
+	return copy
+end
+
+function Ansible:slurp(path)
+	local f, err = io.open(path, "r")
+	if f == nil then
+		Ansible.fail_json({msg="failed to open file " .. path .. ": " .. err})
+	end
+	local content = f:read("*a")
+	if content == nil then
+		self:fail_json({msg="read from file " .. path .. "failed"})
+	end
+	f:close()
+	return content
+end
+
+function Ansible:unslurp(path, content)
+	local f, err = io.open(path, "w+")
+	if f == nil then
+		Ansible.fail_json({msg="failed to open file " .. path .. ": " .. err})
+	end
+	
+	local res = f:write(content)
+
+	if not res then
+		self:fail_json({msg="read from file " .. path .. "failed"})
+	end
+	f:close()
+	return res
+end
+
+local function parse_dict_from_string(str)
+	if 1 == string.find(str, "{") then
+		-- assume json, try to decode it
+		local dict, pos, err = json.decode(str)
+		if not err then
+			return dict
+		end
+	elseif string.find(str, "=") then
+		fields = {}
+		field_buffer = ""
+		in_quote = nil
+		in_escape = false
+		for c in str:gmatch(".") do
+			if in_escape then
+				field_buffer = field_buffer .. c
+				in_escape = false
+			elseif c == '\\' then
+				in_escape = true
+			elseif not in_quote and ('\'' == c or '"' == c) then
+				in_quote = c
+			elseif in_quote and in_quote == c then
+				in_quote = nil
+			elseif not in_quote and (',' == c or ' ' == c) then
+				if string.len(field_buffer) > 0 then
+					fields[#fields + 1] = field_buffer
+				end
+				field_buffer=""
+			else
+				field_buffer = field_buffer .. c
+			end
+		end
+		-- append the final field
+		fields[#fields + 1] = field_buffer
+
+		local dict = {}
+
+		for _,v in ipairs(fields) do
+			local key, val = string.match(v, "^([^=]+)=(.*)")
+
+			if key and val then
+				dict[key] = val
+			end
+		end
+
+		return dict
+	end
+
+	return nil, str ..  " dictionary requested, could not parse JSON or key=value"
+end
+
+local function check_transform_type(variable, ansibletype)
+	-- Types: str list dict bool int float path raw jsonarg
+	if     "str"     == ansibletype then
+		if type(variable) == "string" then
+			return variable
+		end
+	elseif "list"    == ansibletype then
+		if type(variable) == "table" then
+			return variable
+		end
+
+		if type(variable) == "string" then
+			return split(variable, ",")
+		elseif type(variable) == "number" then
+			return {variable}
+		end
+	elseif "dict"    == ansibletype then
+		if type(variable) == "table" then
+			return variable
+		elseif type(variable) == "string" then
+			return parse_dict_from_string(variable)
+		end
+	elseif "bool"    == ansibletype then
+		if "boolean" == type(variable) then
+			return variable
+		elseif "number" == type(variable) then
+			return not (0 == variable)
+		elseif "string" == type(variable) then
+			local BOOLEANS_TRUE  = {'yes', 'on', '1', 'true', 'True'}
+			local BOOLEANS_FALSE = {'no', 'off', '0', 'false', 'False'}
+
+			if Ansible.contains(variable, BOOLEANS_TRUE) then
+				return true
+			elseif Ansible.contains(variable, BOOLEANS_FALSE) then
+				return false
+			end
+		end
+	elseif "int"     == ansibletype or "float"   == ansibletype then
+		if type(variable) == "string" then
+			local var = tonumber(variable)
+			if var then
+				return var
+			end
+		elseif type(variable) == "number" then
+			return variable
+		end
+	elseif "path"    == ansibletype then
+		-- A bit basic, i know
+		if type(variable) == "string" then
+			return variable
+		end
+	elseif "raw"     == ansibletype then
+		return variable
+	elseif "jsonarg" == ansibletype then
+		if     "table" == type(variable) then
+			return variable
+		elseif "string" == type(variable) then
+			local dict, pos, err = json.decode(variable)
+			if not err then
+				return dict
+			end
+		end
+	else
+		return nil, ansibletype .. " is not a known type"
+	end
+
+	return nil, tostring(variable) .. " does not conform to type " .. ansibletype
+end
+
+function Ansible:parse(inputfile)
+	local params, pos, err = json.decode(self:slurp(inputfile))
+
+	if err then
+		self:fail_json({msg="INTERNAL: Illegal json input received"})
+	end
+
+	-- resolve aliases
+	params, err = canonicalize(params, self.spec)
+
+	if not params then
+		self:fail_json({msg="Err: " .. tostring(err)})
+	end
+
+	for k,v in pairs(self.spec) do
+		-- setup defaults
+		if v['default'] then
+			if nil == params[k] then
+				params[k] = v['default']
+			end
+		end
+
+		-- assert requires
+		if v['required'] then
+			if not params[k] then
+				self:fail_json({msg="Required parameter " .. k .. " not provided"})
+			end
+		end
+	end
+	
+	-- check types/choices
+	for k,v in pairs(params) do
+		local typedesc = self.spec[k]['type']
+		if typedesc then
+			local val, err = check_transform_type(v, typedesc)
+			if nil ~= val then
+				params[k] = val
+			else
+				self:fail_json({msg="Err: " .. tostring(err)})
+			end
+		end
+
+		local choices = self.spec[k]['choices']
+		if choices then
+			if not Ansible.contains(v, choices) then
+				self:fail_json({msg=v .. " not a valid choice for " .. k})
+			end
+		end
+	end
+
+	self.params = params
+
+	return params
+end
+
+local function file_exists(path)
+	local f=io.open(path,"r")
+	if f~=nil then
+		io.close(f)
+		return true
+	else
+		return false
+	end
+end
+
+function Ansible:get_bin_path(name, required, candidates)
+	if not candidates then
+		candidates = {}
+	end
+
+	local path = os.getenv("PATH")
+	if path then
+		candidates = append(candidates, split(path, ":"))
+	end
+
+	for _,dir in pairs(candidates) do
+		local fpath = dir .. "/" .. name
+		if file_exists(fpath) then
+			return fpath
+		end
+	end
+
+	if required then
+		self:fail_json({msg="No executable " .. name .. " found in PATH or candidates"})
+	end
+	
+	return nil
+end
+
+function Ansible:remove_file(path)
+	local rc, err = os.remove(path)
+	if nil == rc then
+		self:fail_json({msg="Internal, execute: failed to remove file " .. path})
+	end
+	return rc
+end
+
+local function get_version()
+	local version = assert(string.match(_VERSION, "Lua (%d+.%d+)"))
+	return tonumber(version) -- Aaaah, it hurts to use floating point like this...
+end
+
+function Ansible:run_command(command)
+	local stdout = os.tmpname()
+	local stderr = os.tmpname()
+
+	local cmd = string.format("%s >%q 2>%q", command, stdout, stderr)
+
+	local rc = nil
+	if 5.1 < get_version() then
+		_, _, rc = os.execute(cmd)
+	else
+		rc       = os.execute(cmd)
+	end
+
+	local out = self:slurp(stdout)
+	local err = self:slurp(stderr)
+	
+	self:remove_file(stdout)
+	self:remove_file(stderr)
+
+	return rc, out, err
+end
+
+function Ansible:copy(src, dest)
+	local command = string.format("cp -f %q %q", src, dest)
+	local rc, _,  err = self:run_command(command)
+
+	if rc ~= 0 then
+		return false, err
+	else
+		return true, err
+	end
+end
+
+function Ansible:move(src, dest)
+	local command = string.format("mv -f %q %q", src, dest)
+	local rc, _,  err = self:run_command(command)
+
+	if rc ~= 0 then
+		return false, err
+	else
+		return true, err
+	end
+end
+
+function Ansible:fail_json(kwargs)
+	assert(kwargs['msg'])
+	kwargs['failed'] = true
+	if nil == kwargs['changed'] then
+		kwargs['changed'] = false
+	end
+	if nil == kwargs['invocation'] then
+		kwargs['invocations'] = {module_args=self.params}
+	end
+
+	io.write(json.encode(kwargs))
+	os.exit(1)
+end
+
+function Ansible:exit_json(kwargs)
+	assert(kwargs['msg'])
+	if nil == kwargs['changed'] then
+		kwargs['changed'] = false
+	end
+	if nil == kwargs['invocation'] then
+		kwargs['invocations'] = {module_args=self:get_params()}
+	end
+
+	io.write(json.encode(kwargs))
+	os.exit(0)
+end
+
+function Ansible:get_params()
+	return self.params
+end
+
+function Ansible:ubus_connect()
+	local p = self:get_params()
+	local timeout = p['timeout']
+	if not timeout then
+		timeout = 30
+	end
+	local socket = p['socket']
+
+	local conn = ubus.connect(socket, timeout)
+	if not conn then
+		self:fail_json({msg="Failed to connect to ubus"})
+	end
+
+	return conn
+end
+
+function Ansible:ubus_call(conn, namespace, procedure, arg)
+	local res, status = conn:call(namespace, procedure, arg)
+
+	if nil ~= status and 0 ~= status then
+		self:fail_json({msg="Ubus call failed", call={namespace=namespace, procedure=procedure, arg=arg, status=status}})
+	end
+
+	return res
+end
+
+function Ansible:backup_local(file)
+	local backupdest
+
+	if file_exits(file) then
+		local ext = os.time("%Y-%m-%d@H:%M:%S~")
+
+		backupdest = string.format("%s.%s", file, ext)
+
+		local content = self:slurp(file)
+		local res = self:unslurp(backupdest, content)
+	end
+
+	return backupdest
+end
+
+function Ansible:is_dir(path)
+	local f, err, code = io.open(path, "r")
+
+	if nil == f then
+		return false, err, code
+	end
+
+	local ok, err, code = f:read(1)
+	f:close()
+	return code == 21, nil, nil
+end
+
+function Ansible:check_mode()
+	-- FIXME
+	return false
+end
+
+return Ansible
 
 	end
 	package.preload["dkjson"] = function( ... )
@@ -2258,6 +1706,558 @@ end
 
 return json
 
+
+	end
+	package.preload["BinDecHex"] = function( ... )
+		local arg = _G.arg;
+		_ENV = _ENV;
+
+		--[[
+/*
+ * Copyright (c) 2007 Tim Kelly/Dialectronics
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining 
+ * a copy of this software and associated documentation files (the 
+ * "Software"),  to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to permit 
+ * persons to whom the Software is furnished to do so, subject to the 
+ * following conditions:
+ *
+ * The above copyright notice and this permission notice shall be 
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT 
+ * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR 
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+--]]
+
+--[[
+/*
+ * Copyright (c) 2007 Tim Kelly/Dialectronics
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining 
+ * a copy of this software and associated documentation files (the 
+ * "Software"),  to deal in the Software without restriction, including 
+ * without limitation the rights to use, copy, modify, merge, publish, 
+ * distribute, sublicense, and/or sell copies of the Software, and to permit 
+ * persons to whom the Software is furnished to do so, subject to the 
+ * following conditions:
+ *
+ * The above copyright notice and this permission notice shall be 
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT 
+ * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR 
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/* Thanks to Bernard Clabots for string.gfind to make forward compatible to Lua 5.2 */
+
+--]]
+
+module(..., package.seeall);
+
+string.gfind = string.gfind or string.gmatch
+
+local hex2bin = {
+	["0"] = "0000",
+	["1"] = "0001",
+	["2"] = "0010",
+	["3"] = "0011",
+	["4"] = "0100",
+	["5"] = "0101",
+	["6"] = "0110",
+	["7"] = "0111",
+	["8"] = "1000",
+	["9"] = "1001",
+	["a"] = "1010",
+        ["b"] = "1011",
+        ["c"] = "1100",
+        ["d"] = "1101",
+        ["e"] = "1110",
+        ["f"] = "1111"
+	}
+
+
+
+local bin2hex = {
+	["0000"] = "0",
+	["0001"] = "1",
+	["0010"] = "2",
+	["0011"] = "3",
+	["0100"] = "4",
+	["0101"] = "5",
+	["0110"] = "6",
+	["0111"] = "7",
+	["1000"] = "8",
+	["1001"] = "9",
+	["1010"] = "A",
+        ["1011"] = "B",
+        ["1100"] = "C",
+        ["1101"] = "D",
+        ["1110"] = "E",
+        ["1111"] = "F"
+	}
+
+--[[
+local dec2hex = {
+	["0"] = "0",
+	["1"] = "1",
+	["2"] = "2",
+	["3"] = "3",
+	["4"] = "4",
+	["5"] = "5",
+	["6"] = "6",
+	["7"] = "7",
+	["8"] = "8",
+	["9"] = "9",
+	["10"] = "A",
+	["11"] = "B",
+	["12"] = "C",
+	["13"] = "D",
+	["14"] = "E",
+	["15"] = "F"
+	}
+--]]
+
+
+-- These functions are big-endian and take up to 32 bits
+
+-- Hex2Bin
+-- Bin2Hex
+-- Hex2Dec
+-- Dec2Hex
+-- Bin2Dec
+-- Dec2Bin
+
+
+function Hex2Bin(s)
+
+-- s	-> hexadecimal string
+
+local ret = ""
+local i = 0
+
+
+	for i in string.gfind(s, ".") do
+		i = string.lower(i)
+
+		ret = ret..hex2bin[i]
+
+	end
+
+	return ret
+end
+
+
+function Bin2Hex(s)
+
+-- s 	-> binary string
+
+local l = 0
+local h = ""
+local b = ""
+local rem
+
+l = string.len(s)
+rem = l % 4
+l = l-1
+h = ""
+
+	-- need to prepend zeros to eliminate mod 4
+	if (rem > 0) then
+		s = string.rep("0", 4 - rem)..s
+	end
+
+	for i = 1, l, 4 do
+		b = string.sub(s, i, i+3)
+		h = h..bin2hex[b]
+	end
+
+	return h
+
+end
+
+
+function Bin2Dec(s)
+
+-- s	-> binary string
+
+local num = 0
+local ex = string.len(s) - 1
+local l = 0
+
+	l = ex + 1
+	for i = 1, l do
+		b = string.sub(s, i, i)
+		if b == "1" then
+			num = num + 2^ex
+		end
+		ex = ex - 1
+	end
+
+	return string.format("%u", num)
+
+end
+
+
+
+function Dec2Bin(s, num)
+
+-- s	-> Base10 string
+-- num  -> string length to extend to
+
+local n
+
+	if (num == nil) then
+		n = 0
+	else
+		n = num
+	end
+
+	s = string.format("%x", s)
+
+	s = Hex2Bin(s)
+
+	while string.len(s) < n do
+		s = "0"..s
+	end
+
+	return s
+
+end
+
+
+
+
+function Hex2Dec(s)
+
+-- s	-> hexadecimal string
+
+local s = Hex2Bin(s)
+
+	return Bin2Dec(s)
+
+end
+
+
+
+function Dec2Hex(s)
+
+-- s	-> Base10 string
+
+	s = string.format("%x", s)
+
+	return s
+
+end
+
+
+
+
+-- These functions are big-endian and will extend to 32 bits
+
+-- BMAnd
+-- BMNAnd
+-- BMOr
+-- BMXOr
+-- BMNot
+
+
+function BMAnd(v, m)
+
+-- v	-> hex string to be masked
+-- m	-> hex string mask
+
+-- s	-> hex string as masked
+
+-- bv	-> binary string of v
+-- bm	-> binary string mask
+
+local bv = Hex2Bin(v)
+local bm = Hex2Bin(m)
+
+local i = 0
+local s = ""
+
+	while (string.len(bv) < 32) do
+		bv = "0000"..bv
+	end
+
+	while (string.len(bm) < 32) do
+		bm = "0000"..bm
+	end
+
+
+	for i = 1, 32 do
+		cv = string.sub(bv, i, i)
+		cm = string.sub(bm, i, i)
+		if cv == cm then
+			if cv == "1" then
+				s = s.."1"
+			else
+				s = s.."0"
+			end
+		else
+			s = s.."0"
+
+		end
+	end
+
+	return Bin2Hex(s)
+
+end
+
+
+function BMNAnd(v, m)
+
+-- v	-> hex string to be masked
+-- m	-> hex string mask
+
+-- s	-> hex string as masked
+
+-- bv	-> binary string of v
+-- bm	-> binary string mask
+
+local bv = Hex2Bin(v)
+local bm = Hex2Bin(m)
+
+local i = 0
+local s = ""
+
+	while (string.len(bv) < 32) do
+		bv = "0000"..bv
+	end
+
+	while (string.len(bm) < 32) do
+		bm = "0000"..bm
+	end
+
+
+	for i = 1, 32 do
+		cv = string.sub(bv, i, i)
+		cm = string.sub(bm, i, i)
+		if cv == cm then
+			if cv == "1" then
+				s = s.."0"
+			else
+				s = s.."1"
+			end
+		else
+			s = s.."1"
+
+		end
+	end
+
+	return Bin2Hex(s)
+
+end
+
+
+
+function BMOr(v, m)
+
+-- v	-> hex string to be masked
+-- m	-> hex string mask
+
+-- s	-> hex string as masked
+
+-- bv	-> binary string of v
+-- bm	-> binary string mask
+
+local bv = Hex2Bin(v)
+local bm = Hex2Bin(m)
+
+local i = 0
+local s = ""
+
+	while (string.len(bv) < 32) do
+		bv = "0000"..bv
+	end
+
+	while (string.len(bm) < 32) do
+		bm = "0000"..bm
+	end
+
+
+	for i = 1, 32 do
+		cv = string.sub(bv, i, i)
+		cm = string.sub(bm, i, i)
+		if cv == "1" then
+				s = s.."1"
+		elseif cm == "1" then
+				s = s.."1"
+		else
+			s = s.."0"
+		end
+	end
+
+	return Bin2Hex(s)
+
+end
+
+function BMXOr(v, m)
+
+-- v	-> hex string to be masked
+-- m	-> hex string mask
+
+-- s	-> hex string as masked
+
+-- bv	-> binary string of v
+-- bm	-> binary string mask
+
+local bv = Hex2Bin(v)
+local bm = Hex2Bin(m)
+
+local i = 0
+local s = ""
+
+	while (string.len(bv) < 32) do
+		bv = "0000"..bv
+	end
+
+	while (string.len(bm) < 32) do
+		bm = "0000"..bm
+	end
+
+
+	for i = 1, 32 do
+		cv = string.sub(bv, i, i)
+		cm = string.sub(bm, i, i)
+		if cv == "1" then
+			if cm == "0" then
+				s = s.."1"
+			else
+				s = s.."0"
+			end
+		elseif cm == "1" then
+			if cv == "0" then
+				s = s.."1"
+			else
+				s = s.."0"
+			end
+		else
+			-- cv and cm == "0"
+			s = s.."0"
+		end
+	end
+
+	return Bin2Hex(s)
+
+end
+
+
+function BMNot(v, m)
+
+-- v	-> hex string to be masked
+-- m	-> hex string mask
+
+-- s	-> hex string as masked
+
+-- bv	-> binary string of v
+-- bm	-> binary string mask
+
+local bv = Hex2Bin(v)
+local bm = Hex2Bin(m)
+
+local i = 0
+local s = ""
+
+	while (string.len(bv) < 32) do
+		bv = "0000"..bv
+	end
+
+	while (string.len(bm) < 32) do
+		bm = "0000"..bm
+	end
+
+
+	for i = 1, 32 do
+		cv = string.sub(bv, i, i)
+		cm = string.sub(bm, i, i)
+		if cm == "1" then
+			if cv == "1" then
+				-- turn off
+				s = s.."0"
+			else
+				-- turn on
+				s = s.."1"
+			end
+		else
+			-- leave untouched
+			s = s..cv
+
+		end
+	end
+
+	return Bin2Hex(s)
+
+end
+
+
+-- these functions shift right and left, adding zeros to lost or gained bits
+-- returned values are 32 bits long
+
+-- BShRight(v, nb)
+-- BShLeft(v, nb)
+
+
+function BShRight(v, nb)
+
+-- v	-> hexstring value to be shifted
+-- nb	-> number of bits to shift to the right
+
+-- s	-> binary string of v
+
+local s = Hex2Bin(v)
+
+	while (string.len(s) < 32) do
+		s = "0000"..s
+	end
+
+	s = string.sub(s, 1, 32 - nb)
+
+	while (string.len(s) < 32) do
+		s = "0"..s
+	end
+
+	return Bin2Hex(s)
+
+end
+
+function BShLeft(v, nb)
+
+-- v	-> hexstring value to be shifted
+-- nb	-> number of bits to shift to the right
+
+-- s	-> binary string of v
+
+local s = Hex2Bin(v)
+
+	while (string.len(s) < 32) do
+		s = "0000"..s
+	end
+
+	s = string.sub(s, nb + 1, 32)
+
+	while (string.len(s) < 32) do
+		s = s.."0"
+	end
+
+	return Bin2Hex(s)
+
+end
 
 	end
 
