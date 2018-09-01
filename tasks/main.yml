@@ -1,0 +1,27 @@
+- name: Gather facts
+  ubus: cmd=facts
+
+- name: Check whether opkg caches need update
+  stat:
+    path: /tmp/opkg-lists
+  register: _opkg_lists
+
+- name: Get current system time
+  raw: date +%s
+  register: _epoch
+  check_mode: false
+  changed_when: false
+  when: _opkg_lists.stat.exists
+
+- name: Update opkg cache
+  opkg:
+    name: opkg
+    update_cache: yes
+  register: _update
+  when: not _opkg_lists.stat.exists or
+      _epoch.stdout|int - _opkg_lists.stat.mtime > 86400
+  failed_when: not _opkg_lists.stat.exists and _update.failed
+  changed_when: not _update.failed
+
+- name: Install dependencies for file-related modules
+  opkg: pkg=luaposix,coreutils-sha1sum state=present
