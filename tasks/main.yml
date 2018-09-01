@@ -4,6 +4,7 @@
 - name: Check whether opkg caches need update
   raw: date +%s -r /tmp/opkg-lists
   register: _opkg_epoch
+  check_mode: false
   changed_when: false
   failed_when: false
 
