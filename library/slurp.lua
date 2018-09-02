@@ -1266,7 +1266,7 @@ local base64  = require("base64")
 
 function main(arg)
 	local module = Ansible.new({
-		src = { required=true, aliases={"path"} },
+		src = { required=true, type="path", aliases={"path"} },
 	})
 
 	module:parse(arg[1])
