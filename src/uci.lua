@@ -1,103 +1,65 @@
 #!/usr/bin/lua
 
 local Ansible = require("ansible")
-local ubus    = require("ubus")
 
-function reload_configs(module)
-	local conn = module:ubus_connect()
+local module = Ansible.new({
+	path            = { aliases = {"key", "name"}, type="str"},
+	config          = { type="str" },
+	section         = { type="str" },
+	option          = { type="str" },
+	type            = { type="str" },
+	value           = { type="raw" },
+	values          = { type="dict" },
+	matching_values = { aliases = {"matching"}, type="dict" },
+	state           = { default="present", choices={"present", "absent", "committed", "reverted"} },
+	autocommit      = { default=true, type="bool" },
+})
 
-	local res  = module:ubus_call(conn, "uci", "reload_config", {})
+local conn = nil
 
-	conn:close()
-	module:exit_json({msg="Configs reloaded", result=res})
+function ubus_connect()
+	conn = module:ubus_connect()
 end
 
-function get_configs(module)
-	local conn = module:ubus_connect()
-
-	local res  = module:ubus_call(conn, "uci", "configs", {})
-
-	conn:close()
-	module:exit_json({msg="Configs fetched", result=res})
-end
-
-function docommit(module, conn, config)
-	local conf, sec = check_config(module, conn, config, nil)
-
-	local res = module:ubus_call(conn, "uci", "commit", {config=conf})
-
-	return res
-end
-
-function commit(module)
-	local conn = module:ubus_connect()
-	local path = module:get_params()["name"]
-
-	local configs
-	if path == nil then
-		local conf = module:ubus_call(conn, "uci", "configs", {})
-		configs = conf['configs']
-	else
-		if path["option"] or path["section"] then
-			module:fail_json({msg="Only whole configs can be committed"})
+function assert_path_specified_once()
+	if module.params.path then
+		if module.params.config or module.params.section or module.params.option then
+			module:fail_json{msg="'config', 'section' and 'option' parameters can not be used if 'path', 'key' or 'name' is specified."}
 		end
-
-		configs = { path["config"] }
 	end
-
-	local res = {}
-	for _, conf in ipairs(configs) do
-		res[#res + 1] = docommit(module, conn, conf)
-	end
-
-	module:exit_json({msg="Committed all changes for " .. #configs ..  " configurations", changed=true, result=res})
 end
 
-function get(module)
-	local conn = module:ubus_connect()
-	local p = module:get_params()
-	local path = p["name"]
-
-	local msg = {config=path["config"]}
-	if p["match"] ~= nil then
-		msg["match"] = p["match"]
+function assert_values_specified_once()
+	if module.params.values then
+		if module.params.option or module.params.value then
+			module:fail_json{msg="Please specify either 'values' or 'option' and 'value' pair, not both."}
+		end
 	end
-	if p["type"] ~= nil then
-		msg["type"] = p["type"]
-	end
-	if path["section"] ~= nil then
-		msg["section"] = path["section"] 
-	end
-
-	local res = module:ubus_call(conn, "uci", "get", msg)
-
-	module:exit_json({msg="Got config", changed=false, result=res})
 end
 
-function revert(module)
-	local conn = module:ubus_connect()
-	local path = module:get_params()["name"]
-
-	local configs
-	if path == nil then
-		local conf = module:ubus_call(conn, "uci", "configs", {})
-		configs = conf['configs']
-	else
-		local conf, sec = check_config(module, conn, path["config"], nil)
-		configs = { conf }
-	end
-
-	local res = {}
-	for _, conf in ipairs(configs) do
-		res[#res + 1] = module:ubus_call(conn, "uci", "revert", {config=conf})
-	end
-
-	module:exit_json({msg="Successfully reverted all staged changes for " .. #configs .. " configurations", changed=true, result=res})
+function validate_params()
+	assert_path_specified_once()
+	assert_values_specified_once()
 end
 
-function parse_path(module)
-	local path = module:get_params()['name']
+local changed = false
+
+local diff = {}
+
+function populate_diff(moment)
+	if not module._diff then return end
+	rc, stdout, stderr = module:run_command("uci export")
+	-- FIXME: check for errors
+	diff[moment] = stdout
+end
+
+function canonicalize_path()
 	-- a path consists of config.section.option
+	local path = module.params.path
+	if not path then
+		-- path not specified; nothing to do
+		return
+	end
 
 	-- lua's pattern engine does not seem to be expressive enough to do this in one go
 	local config, section, option
@@ -109,317 +71,213 @@ function parse_path(module)
 		config = path
 	end
 
-	local pathobject = {config=config, section=section, option=option}
-	return pathobject
+	module.params.config = config
+	module.params.section = section
+	module.params.option = option
 end
 
-function query_value(module, conn, path, unique)
-	local res  = conn:call("uci", "get", path)
-
-	if nil == res then
-		return nil
+function stringify_table(x)
+	for k, v in pairs(x) do
+		if type(v) == "table" then
+			stringify_table(v)
+		else
+			x[k] = tostring(v)
+		end
 	end
+end
 
-	if unique and nil ~= res["values"] then
-		module:fail_json({msg="Path specified is amiguos and matches multiple options", path=path, result=res})
+function canonicalize_values()
+	if module.params.option and module.params.value then
+		module.params.values = { [module.params.option]=module.params.value }
 	end
+	if module.params.values then
+		stringify_table(module.params.values)
+	end
+end
 
-	if res["values"] then
-		return res["values"]
+function canonicalize_params()
+	canonicalize_path()
+	canonicalize_values()
+end
+
+function get_changes()
+	return module:ubus_call(conn, "uci", "changes", {config=module.params.config})["changes"]
+end
+
+function assert_autocommit_safe()
+	local config = module.params.config
+	if not module.params.autocommit then
+		return
+	elseif next(get_changes()) ~= nil then
+		module:fail_json{msg="Uncommited changes detected in " .. config .. " config. It is not safe to perform autocommit. Please either disable autocommit, or ensure all " .. config .. " changes are committed (or reverted) prior to this task."}
+	end
+end
+
+function autocommit_if_needed()
+	if not module.params.autocommit then return end
+	if not changed then return end
+	module:ubus_call(conn, "uci", "commit", {config=module.params.config})
+end
+
+function section_matches(tested_values)
+	if module.params.type and module.params.type ~= tested_values[".type"] then
+		return false
+	elseif module.params.matching_values and not section_values_match(tested_values, module.params.matching_values) then
+		return false
 	else
-		return res["value"]
+		return true
 	end
 end
 
-function check_config(module, conn, config, section)
-	local res  = module:ubus_call(conn, "uci", "configs", {})
-
-	if not module.contains(config, res["configs"]) then
-		module:fail_json({msg="Invalid config " .. config})
-	end
-
-	if nil ~= section then
-		res = module:ubus_call(conn, "uci", "get", {config=config, section=section})
-		if res and res["values"] and res["values"][".type"] then
-			return config, section
+function find_section()
+	local sections = module:ubus_call(conn, "uci", "get", {config=module.params.config}).values
+	local found_section = nil
+	for name, values in pairs(sections) do
+		if section_matches(values) then
+			if not found_section then
+				found_section = name
+			else
+				module:fail_json{msg="Multiple sections match specified conditions."}
+			end
 		end
 	end
-
-	return config, nil
+	module.params.section = found_section
 end
 
-function compare_tables(a, b)
-	if a == nil or b == nil then
-		return a == b
-	end
+function create_matching_section()
+	res = module:ubus_call(conn, "uci", "add", {config=module.params.config, name=module.params.section, type=module.params.type, values=module.params.matching_values})
+	module.params.section = res.section
+end
 
-	if type(a) ~= "table" then
-		if type(b) ~= "table" then
-			return a == b
-		end
-		return false
+function ensure_section_exists()
+	if not module.params.section then find_section() end
+	if not module.params.section or get_values() == nil then
+		changed = true
+		create_matching_section()
 	end
-	if #a ~= #b then
-		return false
-	end
-	-- level 1 compare
-	table.sort(a)
-	table.sort(b)
-	for i,v in ipairs(a) do
-		if v ~= b[i] then
-			return false
-		end
-	end
+end
 
+function get_values()
+	return module:ubus_call(conn, "uci", "get", {config=module.params.config, section=module.params.section}).values
+end
+
+function get_configs()
+	return module:ubus_call(conn, "uci", "configs").configs
+end
+
+function arrays_equal(first, second)
+	if #first ~= #second then return false end
+	for index, value in pairs(first) do
+		if second[index] ~= value then return false end
+	end
 	return true
 end
 
-function set_value(module)
-	local p    = module:get_params()
-	local path = p["name"]
-
-	local conn = module:ubus_connect()
-
-	local conf, sec = check_config(module, conn, path["config"], path["section"])
-
-	local target = p["value"]
-	local forcelist = p["forcelist"]
-
-	if type(target) == "table" and #target == 1 and not forcelist then
-		target = target[1]
-	end
-
-	local values = {}
-	if path["option"] then
-		values[path["option"]] = target
-	end
-
-	local res
-	if nil ~= p["match"] then
-		local preres = module:ubus_call(conn, "uci", "changes", {config=conf})
-		local prechanges = preres["changes"] or {}
-
-		local message = {
-			config=conf,
-			values=p["values"],
-			match=p["match"]
-		}
-		res = module:ubus_call(conn, "uci", "set", message) or {}
-
-		-- Since 'uci changes' returns changes in the order they were made,
-		-- determine what the 'set' command changed by stripping off the
-		-- first #prechanges entries from the postchanges.
-		local postres = module:ubus_call(conn, "uci", "changes", {config=conf})
-		local postchanges = postres["changes"] or {}
-		for i = #prechanges, 1, -1 do
-			table.remove(postchanges, i)
-		end
-		res["changes"] = postchanges
-
-		conn:close()
-		if #postchanges > 0 then
-			module:exit_json({msg="Changes made", changed=true, result=res})
-		end
-		module:exit_json({msg="No changes made", changed=false, result=res})
-	elseif not sec then
-		-- We have to create a section and use "uci add"
-		if not p["type"] then
-			module:fail_json({msg="when creating sections, a type is required", message=message})
-		end
-
-		local message = {
-			config=conf,
-			name=path["section"],
-			type=p["type"],
-		}
-
-		if path["option"] then
-			message["values"]=values
-		end
-
-		res = module:ubus_call(conn, "uci", "add", message)
-
-	elseif not compare_tables(target, query_value(module, conn, path, true)) then
-		-- We have to take actions and use "uci set"
-		local message = {
-			config=conf,
-			section=sec,
-			values=values
-		}
-		res = module:ubus_call(conn, "uci", "set", message)
-	else
-		conn:close()
-		module:exit_json({msg="Value already set", changed=false, result=res})
-	end
-
-
-	local autocommit = false
-	if p["autocommit"] then
-		autocommit = true
-		docommit(module, conn, conf)
-	end
-
-	conn:close()
-	module:exit_json({msg="Value successfully set", changed=true, autocommit=autocommit, result=res})
-end
-
-function unset_value(module)
-	local p    = module:get_params()
-	local path = p["name"]
-
-	local conn = module:ubus_connect()
-
-	local conf, sec = check_config(module, conn, path["config"], path["section"])
-
-	-- the whole section is already gone
-	if nil == sec then
-		-- already absent
-		conn:close()
-		module:exit_json({msg="Section already absent", changed=false})
-	end
-
-	-- and nil ~= sec...
-	local message = {
-		config=conf,
-		section=sec
-	}
-
-	-- check if we have got a option
-	if path["option"] then
-		local is     = query_value(module, conn, path, false)
-		if not is then
-			conn:close()
-			module:exit_json({msg="Option already absent", changed=false})
-		end
-
-		message["option"] = path["option"]
-	end
-
-
-	local res = module:ubus_call(conn, "uci", "delete", message)
-
-	local autocommit = false
-	if p["autocommit"] then
-		local autocommit = true
-		docommit(module, conn, conf)
-	end
-
-	conn:close()
-	module:exit_json({msg="Section successfully deleted", changed=true, autocommit=autocommit, result=res})
-end
-
-function check_parameters(module)
-	local p = module:get_params()
-
-	-- Validate the path
-	if p["name"] then
-		p["name"] = parse_path(module, p["name"])
-	end
-
-	-- op requires that no state is given, configs does not take any parameter
-	if p["op"] then
-		-- all operands do not take a state or value parameter
-		if p["value"] then
-			module:fail_json({msg="op=* do not work with 'state','value' or 'autocommit' arguments"})
-		end
-
-		-- config does not take a path parameter
-		if "configs" == p["op"] and p["name"] then
-			module:fail_json({msg="'op=config' does not take a 'path' argument"})
-		end
-	else
-		-- in the normal case name and state are required
-		if    (not p["name"])
-		   or (not p["state"]) then
-			module:fail_json({msg="Both name and state are required to set/unset values"})
-		end
-
-		-- when performing an "uci set", a value is required
-		if ("set" == p["state"] or "present" == p["state"]) then
-			if p["name"]["option"] and  not p["value"] then  -- Setting a regular value
-				module:fail_json({msg="When using 'uci set', a value is required"})
-			elseif not p["name"]["option"] and not p["type"] and not p["match"] then -- Creating a section
-				module:fail_json({msg="When creating sections with 'uci set', a type is required"})
+function section_values_match(section_values, matching_pattern)
+	for key, value_to_match in pairs(matching_pattern) do
+		actual_value = section_values[key]
+		if type(actual_value) ~= type(value_to_match) then
+			return false
+		elseif type(actual_value) == "table" then
+			if not arrays_equal(actual_value, value_to_match) then
+				return false
 			end
-		end
-
-		if nil ~= p["value"] and ("unset" == p["state"] or "absent" == p["state"]) then
-			module:fail_json({msg="When deleting options, no value can be set"})
-		end
-
-		if nil ~= p["forcelist"] and  ("unset" == p["state"] or "absent" == p["state"]) then
-			module:fail_json({msg="'forcelist' only applies to set operations"})
+		elseif actual_value ~= value_to_match then
+			return false
 		end
 	end
-
+	return true
 end
 
-function main(arg)
-	local module = Ansible.new({
-		name       = { aliases = {"path", "key"}, type="str"},
-		value      = { type="list" },
-		state      = { default="present", choices={"present", "absent", "set", "unset"} },
-		op         = { choices={"configs", "commit", "revert", "get"} },
-		reload     = { aliases = {"reload_configs", "reload-configs"}, type='bool'},
-		autocommit = { default=true, type="bool" },
-		forcelist  = { default=false, type="bool" },
-		type       = { aliases = {"section-type"}, type="str" },
-		socket     = { type="path" },
-		timeout    = { type="int"},
-		match      = { type="dict"},
-		values     = { type="dict"}
-	})
+function values_will_change()
+	return not section_values_match(get_values(), module.params.values or {})
+end
 
-	module:parse(arg[1])
-	check_parameters(module)
-
-	local p = module:get_params()
-
-	if p["reload"] then
-		reload_configs(module)
+function set_values()
+	if values_will_change() then
+		changed = true
+		module:ubus_call(conn, "uci", "set", {config=module.params.config, section=module.params.section, values=module.params.values})
 	end
+end
 
-	-- Execute operation
-	if     "configs" == p["op"] then
-		get_configs(module)
-	elseif "commit"  == p["op"] then
-		commit(module)
-	elseif "revert"  == p["op"] then
-		revert(module)
-	elseif "get"  == p["op"] then
-		get(module)
+function ensure_present()
+	assert_autocommit_safe()
+	ensure_section_exists()
+	set_values()
+	autocommit_if_needed()
+end
+
+function delete()
+	local current_values = get_values()
+	if not current_values then return end
+	if module.params.option and not current_values[module.params.option] then return end
+	changed = true
+	module:ubus_call(conn, "uci", "delete", {config=module.params.config, section=module.params.section, option=module.params.option})
+end
+
+function ensure_absent()
+	assert_autocommit_safe()
+	if not module.params.section then find_section() end
+	delete()
+	autocommit_if_needed()
+end
+
+function specified_or_all_configs()
+	if module.params.config then
+		return {module.params.config}
 	else
-		-- If no op was given, simply enforce the setting state
-		local state = p["state"]
-		local doset = true
-		if "absent" == state or "unset" == state then
-			doset = false
-		elseif "present" ~= state and "set" ~= state then
-  			module:fail_json({msg="Set state must be one of set, present, unset, absent"})
-		end
+		return get_configs()
+	end
+end
 
-		-- check if a full path was specified
-		local path = p["name"]
-		if not path["config"] then
-  			module:fail_json({msg="Set operation requires a path"})
-        end
-  		if not path["section"] then
-		  	if doset and not p["type"] and not p["match"] then
-				module:fail_json({msg="Set operation requires a type, a match, or a path of"
-					.. " the form '<config>.<section>[.<option>]'", parsed=pathobject})
-			elseif not doset then
-				module:fail_json({msg="Set absent operation requires a path of"
-					.. " the form '<config>.<section>[.<option>]'", parsed=pathobject})
-			end
-  		end
+function config_has_uncommited_changes(config)
+	if module:ubus_call(conn, "uci", "changes", {config=config}).changes then
+		return true
+	else
+		return false
+	end
+end
 
-		-- Do the ops
-		if doset then
-			set_value(module)
-		else
-			unset_value(module)
+function ensure_comitted()
+	for _, config in pairs(specified_or_all_configs()) do
+		if config_has_uncommited_changes(config) then
+			changed = true
+			module:ubus_call(conn, "uci", "commit", {config=config})
 		end
 	end
 end
 
-main(arg)
+function ensure_reverted()
+	for _, config in pairs(specified_or_all_configs()) do
+		if config_has_uncommited_changes(config) then
+			changed = true
+			module:ubus_call(conn, "uci", "revert", {config=config})
+		end
+	end
+end
+
+function ensure_state()
+	local state = module.params.state
+	if state == "present" then
+		ensure_present()
+	elseif state == "absent" then
+		ensure_absent()
+	elseif state == "committed" then
+		ensure_comitted()
+	elseif state == "reverted" then
+		ensure_reverted()
+	end
+end
+
+function main()
+	module:parse()
+	validate_params()
+	canonicalize_params()
+	ubus_connect()
+	populate_diff("before")
+	ensure_state()
+	populate_diff("after")
+	module:exit_json({changed=changed, diff=diff})
+end
+
+main()
