@@ -164,7 +164,12 @@ function ensure_section_exists()
 end
 
 function get_values()
-	return module:ubus_call(conn, "uci", "get", {config=module.params.config, section=module.params.section}).values
+	local res = module:ubus_call(conn, "uci", "get", {config=module.params.config, section=module.params.section})
+	if res then
+		return res.values
+	else
+		return nil
+	end
 end
 
 function get_configs()
