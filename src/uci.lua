@@ -48,7 +48,13 @@ local diff = {}
 
 function populate_diff(moment)
 	if not module._diff then return end
-	rc, stdout, stderr = module:run_command("uci export")
+	local cmd
+	if module.params.config then
+		cmd = "uci export " .. module.params.config
+	else
+		cmd = "uci export"
+	end
+	rc, stdout, stderr = module:run_command(cmd)
 	-- FIXME: check for errors
 	diff[moment] = stdout
 end
